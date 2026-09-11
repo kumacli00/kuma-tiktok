@@ -5,12 +5,16 @@
 <title>TikTok診断レポート</title>
 <style>
 :root { --bg:#fbfaf8; --fg:#1c1b19; --muted:#6b6862; --line:#e4e0d9;
-        --card:#fff; --accent:#d94f6a; --good:#2f8f6b; --bad:#c4453f; }
+        --card:#fff; --accent:#d94f6a; --good:#2f8f6b; --bad:#c4453f;
+        /* 共通CSS（report_mobile.css）が使う名前に合わせる別名 */
+        --ground:var(--bg); --ink-soft:var(--muted); }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme=light]) { --bg:#16151a; --fg:#eceaf0; --muted:#9b96a3;
     --line:#2e2c35; --card:#1e1d24; --accent:#ff6b88; --good:#4bbd90; --bad:#e0685f; } }
 * { box-sizing:border-box }
-body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.75 -apple-system,"Hiragino Sans",sans-serif }
+/* Windows（受付・事務のPC）でも同じ見え方になるように和文フォントを並べる */
+body { margin:0; background:var(--bg); color:var(--fg);
+        font:15px/1.75 -apple-system,"Hiragino Sans","Yu Gothic UI","Noto Sans JP","Meiryo",sans-serif }
 .wrap { max-width:920px; margin:0 auto; padding:48px 24px 90px }
 h1 { font-size:30px; margin:0 0 6px; letter-spacing:-.015em }
 h2 { font-size:20px; margin:56px 0 8px; padding-bottom:8px; border-bottom:2px solid var(--line) }
@@ -28,6 +32,10 @@ th { color:var(--muted); font-weight:600; font-size:12px; white-space:nowrap }
 .barcell { width:22% }
 .bar { background:var(--line); border-radius:3px; height:7px; width:100% }
 .bar span { display:block; height:7px; border-radius:3px }
+tr.zero td { color:var(--muted) }
+tr.zero td.num { font-weight:500 }
+.small { color:var(--muted); font-size:11.5px; font-weight:500 }
+.warn { color:var(--bad); font-weight:600 }
 .tag { font-size:11px; padding:2px 7px; border-radius:99px; white-space:nowrap }
 .t-derm { background:color-mix(in srgb,var(--good) 18%,transparent); color:var(--good) }
 .t-promo { background:color-mix(in srgb,var(--bad) 18%,transparent); color:var(--bad) }
@@ -37,99 +45,273 @@ th { color:var(--muted); font-weight:600; font-size:12px; white-space:nowrap }
 .kpi b { display:block; font-size:25px; letter-spacing:-.02em; font-variant-numeric:tabular-nums }
 .kpi small { color:var(--muted); font-size:12px }
 .two { display:flex; gap:20px; flex-wrap:wrap } .two > div { flex:1 1 320px; min-width:0 }
-.scroll { overflow-x:auto }
 ul { padding-left:20px } li { margin:8px 0 }
+/* 目次 */
+.toc { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 18px 16px; margin:18px 0 34px }
+.toc b { font-size:14px }
+.toc ol { margin:8px 0 0; padding-left:22px; font-size:14px }
+.toc li { margin:5px 0 }
+.toc a { color:var(--fg) }
+/* 効きが薄いと分かっている節は畳んでおく */
+details { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:2px 20px; margin:18px 0 }
+details[open] { padding-bottom:14px }
+summary { cursor:pointer; padding:14px 0; font-weight:600 }
+/* スマホでは本文の列を出さない（幅2〜3文字に潰れて15行以上に折り返すため） */
+.mobile-only { display:none }
+@media (max-width:640px) {
+  .wrap { padding:32px 14px 70px }
+  h1 { font-size:24px }
+  .bodycol { display:none }
+  .mobile-only { display:block }
+}
 footer { margin-top:60px; color:var(--muted); font-size:12px; border-top:1px solid var(--line); padding-top:16px }
+
+/* ここから下は sns/report_mobile.css（5媒体で共通） */
+/* 狭い画面で表とグラフが「切れていることに気づけない」問題を消す共通部品。
+   report_mobile.js と対で使う。各媒体の gen_report.py がインライン展開する。
+
+   背景: スマホ(343px)に min-width:560px の表を入れているため右半分が画面外に出る。
+   横スクロールはできるが、影も矢印も無いので「切れている」と分からない。
+   数字の桁の途中で切れるため 5,362 が 5 に見えるなど、誤読も起きていた。 */
+
+/* JS が各 table / 横長SVG をこれで包む */
+.tbl-scroll{
+  position:relative;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  /* 右端にフェードを出して「まだ続きがある」と分かるようにする。スクロールしきると消える（JSが is-end を付ける） */
+}
+.tbl-scroll::after{
+  content:"";
+  position:absolute; top:0; right:0; bottom:0; width:34px;
+  pointer-events:none;
+  background:linear-gradient(to right, transparent, var(--ground, #0E141A));
+  opacity:1; transition:opacity .18s;
+}
+.tbl-scroll.is-end::after{opacity:0}
+.tbl-scroll:not(.is-scrollable)::after{opacity:0}
+
+/* 「→ 横にスクロールできます」の案内。はみ出している時だけ出す */
+.tbl-hint{
+  display:none;
+  font-size:12.5px; line-height:1.6;
+  margin:.1rem 0 .45rem;
+  color:var(--ink-soft, #9BA9B6);
+}
+.tbl-scroll.is-scrollable + .tbl-hint,
+.tbl-hint.is-on{display:block}
+.tbl-hint::before{content:"→ "; font-weight:700}
+
+/* 横に振っても「どの行か」を見失わないように1列目を固定 */
+@media (max-width:640px){
+  .tbl-scroll table th:first-child,
+  .tbl-scroll table td:first-child{
+    position:sticky; left:0; z-index:2;
+    background:var(--surface, var(--card, #131B23));
+    /* 固定列と本体の境目 */
+    box-shadow:1px 0 0 var(--rule, var(--line, #243039));
+  }
+  .tbl-scroll table thead th{
+    position:sticky; top:0; z-index:3;
+    background:var(--surface, var(--card, #131B23));
+  }
+  .tbl-scroll table thead th:first-child{z-index:4}
+
+  /* 最小文字サイズの底上げ。10〜11px が多用されていて読めなかった */
+  .tbl-scroll table{font-size:13px}
+  .tbl-scroll table th,
+  .tbl-scroll table td{padding:.5rem .55rem; white-space:nowrap}
+}
+
+/* 型名などが1文字ずつ縦に割れるのを防ぐ（「症状の見分け・雑学」が9行になっていた） */
+.tbl-scroll table td:first-child,
+.tbl-scroll table th:first-child{white-space:nowrap}
+
+/* 横長SVGが縮んで軸ラベルが3〜4pxになる問題。縮めずに横スクロールさせる */
+.svg-scroll{position:relative; overflow-x:auto; -webkit-overflow-scrolling:touch}
+.svg-scroll > svg{max-width:none}   /* width:100% による強制縮小をやめる */
+
+@media (max-width:640px){
+  /* グラフは縮小せず、実寸のまま横に送る */
+  .svg-scroll > svg{height:auto}
+}
+
+/* 冒頭の用語ボックス（report_terms.glossary_html が出すHTML） */
+.glossary{
+  border:1px solid var(--rule, var(--line, #243039));
+  border-radius:10px;
+  padding:1rem 1.1rem 1.15rem;
+  margin:1.4rem 0 1.8rem;
+  background:var(--surface, var(--card, #131B23));
+}
+.glossary h2{font-size:15px; margin:0 0 .2rem}
+.glossary .g-lead{
+  font-size:12.5px; margin:0 0 .8rem;
+  color:var(--ink-soft, #9BA9B6);
+}
+.glossary dl{margin:0}
+.glossary .g-row{
+  display:grid; grid-template-columns:9.5rem 1fr;
+  gap:.3rem .9rem; padding:.42rem 0;
+  border-top:1px solid var(--rule, var(--line, #243039));
+}
+.glossary .g-row:first-child{border-top:0}
+.glossary dt{font-weight:700; font-size:14px}
+.glossary dd{margin:0; font-size:14px; line-height:1.7}
+.glossary .g-note{
+  display:block; font-size:12.5px; margin-top:.12rem;
+  color:var(--ink-soft, #9BA9B6);
+}
+@media (max-width:640px){
+  .glossary .g-row{grid-template-columns:1fr; gap:.1rem}
+  .glossary dt{font-size:13.5px}
+}
+
 </style></head><body><div class="wrap">
 
 <h1>TikTok診断レポート</h1>
 <div class="sub">@kumatori.mohri
  ／ 146本（2022-06-12 〜 2026-09-07）
- ／ フォロワー 3,827人 ／ 生成 2026-09-11 09:54</div>
+ ／ フォロワー 3,827人 ／ 生成 2026-09-11 15:07</div>
 
-<h2>結論</h2>
+<section class='glossary'><h2>このページで使う言葉</h2><p class='g-lead'>この3〜5語だけ押さえれば、以下は読めます。</p><dl><div class='g-row'><dt>中央値</dt><dd>ちょうど真ん中の1本の数字<span class='g-note'>本数ぶんを良い順に並べて真ん中を採る。大当たり1本に引っ張られないので、平均より「普段の実力」に近い</span></dd></div><div class='g-row'><dt>到達率</dt><dd>フォロワー数に対して、何回再生されたかの割合<span class='g-note'>フォロワーにどれだけ届いているかの目安。100%を超えることもある</span></dd></div><div class='g-row'><dt>主題</dt><dd>その動画が何の話から入るか<span class='g-note'>入り口の話題のこと</span></dd></div><div class='g-row'><dt>尺</dt><dd>動画の長さ</dd></div></dl></section>
+
+<nav class="toc"><b>このページの中身</b>
+<ol>
+<li><a href="#ketsuron">結論（いま何が起きているか）</a></li>
+<li><a href="#yaru">やるべきこと（7つ）</a></li>
+<li><a href="#yoi">うまくいっていること</a></li>
+<li><a href="#ima">根拠1：1本あたりの再生数が落ちている</a></li>
+<li><a href="#kata">根拠2：いま再生されている型、されていない型</a></li>
+<li><a href="#shudai">根拠3：何の話から入るかで差がついている</a></li>
+<li><a href="#tag">根拠4：ハッシュタグ</a></li>
+<li><a href="#eng">根拠5：反応（いいね・コメント・シェア）</a></li>
+<li><a href="#ichiran">根拠6：1本ずつの一覧</a></li>
+<li><a href="#sanko">参考：動画の長さ／曜日・時間帯（効きは小さい）</a></li>
+</ol></nav>
+
+<h2 id="ketsuron">結論</h2>
 <div class="card lead">
-<p><b>主題によって再生数が27倍違う。</b>直近60日で、症状名・一般皮膚が主題の回は9本・中央値1,519再生、
-クマ取り・美容医療の宣伝が主題の回は9本・中央値56再生。</p>
-<p>宣伝主題9本のうち7本が三桁に届いていない。フォロワー3,827人に対してこの数字は、内容の良し悪しではなく<b>フォロワーにすら配信されていない</b>ことを示す。同じ直近60日のなかで10.2万再生を取った回がある以上、原因は主題側にある。</p>
-<p>落ちたのは1本あたりの届き方。
-<b>やるべきは本数を増やすことではなく、入口の主題を替えること。</b></p>
+<p><b>動画の入り口で何の話をするかによって、再生数が27倍違う。</b>直近60日で、症状名・一般皮膚の話から入った回は9本で中央値（ちょうど真ん中の1本の数字）1,519再生、
+クマ取り・美容医療の宣伝から入った回は9本で中央値56再生。</p>
+<p>宣伝から入った9本のうち7本は、100回も再生されていない。フォロワー3,827人に対してこの数字は、内容の良し悪しではなく<b>フォロワーにすら配信されていない</b>ことを示す。同じ直近60日のなかで10.2万再生を取った回がある以上、原因は中身ではなく、入り口の話題にある。</p>
+<p>落ちているのは本数ではなく、1本あたりの届き方。
+<b>やるべきは本数を増やすことではなく、動画の入り口で何の話をするかを替えること。</b></p>
 </div>
 
 <div class="kpi">
-<div><b>8,389</b><small>全期間の再生中央値</small></div>
-<div><b>366</b><small>直近60日の中央値</small></div>
-<div><b>1,519</b><small>症状名主題（直近）</small></div>
-<div><b>56</b><small>宣伝主題（直近）</small></div>
-<div><b>10%</b><small>フォロワーに対する到達率</small></div>
+<div><b>8,389</b><small>ふだんの再生数（全期間146本の中央値）</small></div>
+<div><b>366</b><small>ふだんの再生数（直近60日）</small></div>
+<div><b>1,519</b><small>症状名の話から入った回（直近）</small></div>
+<div><b>56</b><small>宣伝から入った回（直近）</small></div>
+<div><b>19本</b><small>直近60日の投稿数</small></div>
 </div>
 
-<h2>いま起きていること</h2>
+<h2 id="yaru">やるべきこと</h2>
+<ul>
+<li><b>1. 動画の入り口を症状名にする。</b>「クマ取り」ではなく、見る人が自分の症状として検索する言葉から入る。
+見終わる頃に目元へ接続する構造にする。</li>
+<li><b>2. ハッシュタグの先頭を症状名にする。</b>#クマ取り は付けても最後に1つで足りる。</li>
+<li><b>3. 動画の長さは、伸びの決め手になっていない。</b>動画の長さと再生数は、ほとんど連動していない。上位12本の長さは中央値51秒、直近は60秒。長さを目標にせず、何の話から入るかを優先する。</li>
+<li><b>4. キャンペーン・料金・カウンセリングの宣伝だけの投稿をやめる。</b>直近60日の宣伝から入った回は9本・中央値56再生。
+告知は、届いた回の中で一言触れる形にする。</li>
+<li><b>5. 企画の良し悪しはシェア率で判定する。</b>再生数は何の話から入ったかに引きずられるが、シェア率は中身の力を映す。</li>
+<li><b>6. フォロワー数を目標にしない。</b>いま1本あたりの再生数はフォロワー3,827人の10%（366再生）。
+フォロワーが増えても、届き方はほぼ決まっていない。</li>
+<li><b>7. 週3.1本のうち1本を「症状の見分け・雑学」に固定する。</b>大当たりを狙うのではなく、おすすめに載る枠を毎週確保する。</li>
+</ul>
 
-<h3>1本あたりの力が落ちている</h3>
-<div class="scroll"><table>
-<tr><th>年</th><th class="num">本数</th><th class="num">再生中央値</th><th class="num">最大</th><th></th></tr>
-<tr><td class='date'>2022</td><td class='num'>20</td><td class='num'>1.3万</td><td class='num'>3.9万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2023</td><td class='num'>43</td><td class='num'>9,351</td><td class='num'>6.1万</td><td class='barcell'><div class="bar"><span style="width:71.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2024</td><td class='num'>21</td><td class='num'>7,781</td><td class='num'>2.0万</td><td class='barcell'><div class="bar"><span style="width:59.1%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025</td><td class='num'>40</td><td class='num'>1.1万</td><td class='num'>17.6万</td><td class='barcell'><div class="bar"><span style="width:81.9%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2026</td><td class='num'>22</td><td class='num'>616</td><td class='num'>10.2万</td><td class='barcell'><div class="bar"><span style="width:4.7%;background:var(--accent)"></span></div></td></tr>
+<h2 id="yoi">うまくいっていること</h2>
+<ul>
+<li><b>当たりの型は自前で持っている。</b>「失敗・後悔・経過」・「症状の見分け・雑学」は、他所から借りずに撮れる。</li>
+<li><b>直近の最高は10.2万再生（症状の見分け・雑学）。</b>同じ型は直近60日に7本あるが、その中央値は1,976再生で、10.2万再生はこの1本だけ。型としては続けられるが、<b>毎回この再生数になるという意味ではない</b>。</li>
+<li><b>直近60日は投稿が止まっていない。</b>2026-07-31以降の43日間で19本、週3.1本ペース。何の話から入るかを替えるだけで効き始める土台はある。（ただし直近18ヶ月のうち6ヶ月は投稿が0本。<a href='#tsuki'>月別の表</a>）</li>
+</ul>
+
+<h2 id="ima">根拠1：1本あたりの再生数が落ちている</h2>
+
+<h3>年ごと</h3>
+<div class="tbl-scroll"><table>
+<tr><th>年</th><th class="num">本数</th><th class="num">再生中央値</th><th>中央値の比較</th><th class="num">最大</th></tr>
+<tr><td class='date'>2022</td><td class='num'>20</td><td class='num'>1.3万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td><td class='num'>3.9万</td></tr>
+<tr><td class='date'>2023</td><td class='num'>43</td><td class='num'>9,351</td><td class='barcell'><div class="bar"><span style="width:71.0%;background:var(--accent)"></span></div></td><td class='num'>6.1万</td></tr>
+<tr><td class='date'>2024</td><td class='num'>21</td><td class='num'>7,781</td><td class='barcell'><div class="bar"><span style="width:59.1%;background:var(--accent)"></span></div></td><td class='num'>2.0万</td></tr>
+<tr><td class='date'>2025</td><td class='num'>40</td><td class='num'>1.1万</td><td class='barcell'><div class="bar"><span style="width:81.9%;background:var(--accent)"></span></div></td><td class='num'>17.6万</td></tr>
+<tr><td class='date'>2026</td><td class='num'>22</td><td class='num'>616</td><td class='barcell'><div class="bar"><span style="width:4.7%;background:var(--accent)"></span></div></td><td class='num'>10.2万</td></tr>
 </table></div>
-<p class="note">本数は減っていない。中央値だけが落ちている。累計再生なので古い投稿ほど有利であることを踏まえても、この差は説明がつかない。</p>
+<p class="note">棒の長さは「再生中央値」。本数は減っていない。中央値だけが落ちている。
+再生数は累計なので古い投稿ほど有利だが、それを踏まえてもこの差は説明がつかない。</p>
 
-<h3>月ごとに見ると、落ちた時期がはっきりする</h3>
-<div class="scroll"><table>
-<tr><th>月</th><th class="num">本数</th><th class="num">再生中央値</th><th></th></tr>
-<tr><td class='date'>2024-10</td><td class='num'>1</td><td class='num'>5,832</td><td class='barcell'><div class="bar"><span style="width:9.5%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2024-11</td><td class='num'>5</td><td class='num'>6,337</td><td class='barcell'><div class="bar"><span style="width:10.4%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2024-12</td><td class='num'>2</td><td class='num'>9,757</td><td class='barcell'><div class="bar"><span style="width:16.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-01</td><td class='num'>5</td><td class='num'>6.1万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-02</td><td class='num'>3</td><td class='num'>6,150</td><td class='barcell'><div class="bar"><span style="width:10.1%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-03</td><td class='num'>9</td><td class='num'>1.6万</td><td class='barcell'><div class="bar"><span style="width:25.6%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-04</td><td class='num'>4</td><td class='num'>6,027</td><td class='barcell'><div class="bar"><span style="width:9.9%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-05</td><td class='num'>1</td><td class='num'>1.5万</td><td class='barcell'><div class="bar"><span style="width:25.3%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-06</td><td class='num'>2</td><td class='num'>2.1万</td><td class='barcell'><div class="bar"><span style="width:33.8%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-07</td><td class='num'>8</td><td class='num'>1.5万</td><td class='barcell'><div class="bar"><span style="width:24.3%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-08</td><td class='num'>3</td><td class='num'>1.2万</td><td class='barcell'><div class="bar"><span style="width:19.6%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-09</td><td class='num'>1</td><td class='num'>5,216</td><td class='barcell'><div class="bar"><span style="width:8.5%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-10</td><td class='num'>2</td><td class='num'>5,936</td><td class='barcell'><div class="bar"><span style="width:9.7%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2025-12</td><td class='num'>2</td><td class='num'>6,626</td><td class='barcell'><div class="bar"><span style="width:10.8%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2026-03</td><td class='num'>3</td><td class='num'>5,149</td><td class='barcell'><div class="bar"><span style="width:8.4%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2026-07</td><td class='num'>1</td><td class='num'>2,802</td><td class='barcell'><div class="bar"><span style="width:4.6%;background:var(--accent)"></span></div></td></tr>
+<h3 id="tsuki">月ごと（直近18ヶ月）</h3>
+<div class="tbl-scroll"><table>
+<tr><th>月</th><th class="num">本数</th><th class="num">再生中央値</th><th>中央値の比較</th></tr>
+<tr><td class='date'>2025-04</td><td class='num'>4</td><td class='num'>6,027</td><td class='barcell'><div class="bar"><span style="width:29.2%;background:var(--accent)"></span></div></td></tr>
+<tr><td class='date'>2025-05</td><td class='num'>1</td><td class='num'>1.5万</td><td class='barcell'><div class="bar"><span style="width:74.9%;background:var(--accent)"></span></div></td></tr>
+<tr><td class='date'>2025-06</td><td class='num'>2</td><td class='num'>2.1万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
+<tr><td class='date'>2025-07</td><td class='num'>8</td><td class='num'>1.5万</td><td class='barcell'><div class="bar"><span style="width:71.9%;background:var(--accent)"></span></div></td></tr>
+<tr><td class='date'>2025-08</td><td class='num'>3</td><td class='num'>1.2万</td><td class='barcell'><div class="bar"><span style="width:58.1%;background:var(--accent)"></span></div></td></tr>
+<tr><td class='date'>2025-09</td><td class='num'>1</td><td class='num'>5,216</td><td class='barcell'><div class="bar"><span style="width:25.3%;background:var(--accent)"></span></div></td></tr>
+<tr><td class='date'>2025-10</td><td class='num'>2</td><td class='num'>5,936</td><td class='barcell'><div class="bar"><span style="width:28.7%;background:var(--accent)"></span></div></td></tr>
+<tr class='zero'><td class='date'>2025-11</td><td class='num'>0</td><td class='num'>投稿なし</td><td class='barcell'></td></tr>
+<tr><td class='date'>2025-12</td><td class='num'>2</td><td class='num'>6,626</td><td class='barcell'><div class="bar"><span style="width:32.1%;background:var(--accent)"></span></div></td></tr>
+<tr class='zero'><td class='date'>2026-01</td><td class='num'>0</td><td class='num'>投稿なし</td><td class='barcell'></td></tr>
+<tr class='zero'><td class='date'>2026-02</td><td class='num'>0</td><td class='num'>投稿なし</td><td class='barcell'></td></tr>
+<tr><td class='date'>2026-03</td><td class='num'>3</td><td class='num'>5,149</td><td class='barcell'><div class="bar"><span style="width:24.9%;background:var(--accent)"></span></div></td></tr>
+<tr class='zero'><td class='date'>2026-04</td><td class='num'>0</td><td class='num'>投稿なし</td><td class='barcell'></td></tr>
+<tr class='zero'><td class='date'>2026-05</td><td class='num'>0</td><td class='num'>投稿なし</td><td class='barcell'></td></tr>
+<tr class='zero'><td class='date'>2026-06</td><td class='num'>0</td><td class='num'>投稿なし</td><td class='barcell'></td></tr>
+<tr><td class='date'>2026-07</td><td class='num'>1</td><td class='num'>2,802</td><td class='barcell'><div class="bar"><span style="width:13.6%;background:var(--accent)"></span></div></td></tr>
 <tr><td class='date'>2026-08</td><td class='num'>14</td><td class='num'>221</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--accent)"></span></div></td></tr>
-<tr><td class='date'>2026-09</td><td class='num'>4</td><td class='num'>377</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--accent)"></span></div></td></tr>
+<tr><td class='date'>2026-09</td><td class='num'>4</td><td class='num'>377</td><td class='barcell'><div class="bar"><span style="width:1.8%;background:var(--accent)"></span></div></td></tr>
 </table></div>
+<p class="note">棒の長さは「再生中央値」。<b>投稿が0本だった月も、行として出している。</b>直近18ヶ月（2025-04〜2026-09）のうち<b>6ヶ月は投稿が0本</b>（2025-11・2026-01・2026-02・2026-04・2026-05・2026-06）。いちばん長いときで<b>3ヶ月続けて出していない</b>。</p>
 
-<h3>フォロワーが資産になっていない</h3>
-<p>直近の中央値366再生は、フォロワー3,827人に対して<b>10%</b>。
-それ以前の40本では246%だった。フォロワーは増えても、投稿が届く先にはなっていない。
+<h3>フォロワーは増えても、届く先になっていない</h3>
+<p>直近の再生中央値366回は、フォロワー3,827人に対して<b>10%</b>（この％を到達率と呼ぶ）。
+それ以前の40本では9,398回で、<b>246%</b>だった。</p>
+<p class="note">ここでいう到達率は「1本あたりの再生数 ÷ フォロワー数」。何人に届いたかではなく再生回数なので、
+フォロワー以外にも配信されれば100%を超える（以前は246%あった）。
 TikTokはフォロワーよりおすすめ経由の比重が大きいので、<b>フォロワー数を追う意味は薄い</b>。</p>
 
-<h2>効いている型と、効いていない型</h2>
-<div class="scroll"><table>
-<tr><th>型</th><th class="num">本数</th><th class="num">中央値</th><th class="num">最大</th><th class="num">直近60日</th><th></th></tr>
-<tr><td>失敗・後悔・経過</td><td class='num'>57</td><td class='num'>9,355</td><td class='num'>17.6万</td><td class='num'>2本 / 40</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td>施術・術式の解説</td><td class='num'>32</td><td class='num'>9,013</td><td class='num'>6.1万</td><td class='num'>4本 / 37</td><td class='barcell'><div class="bar"><span style="width:96.3%;background:var(--accent)"></span></div></td></tr>
-<tr><td>その他</td><td class='num'>39</td><td class='num'>8,081</td><td class='num'>3.2万</td><td class='num'>3本 / 366</td><td class='barcell'><div class="bar"><span style="width:86.4%;background:var(--accent)"></span></div></td></tr>
-<tr><td>有名人・時事</td><td class='num'>4</td><td class='num'>7,295</td><td class='num'>9,834</td><td class='num'>—</td><td class='barcell'><div class="bar"><span style="width:78.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td>告知・キャンペーン</td><td class='num'>5</td><td class='num'>6,534</td><td class='num'>3.0万</td><td class='num'>1本 / 39</td><td class='barcell'><div class="bar"><span style="width:69.8%;background:var(--accent)"></span></div></td></tr>
-<tr><td>症状の見分け・雑学</td><td class='num'>7</td><td class='num'>1,976</td><td class='num'>10.2万</td><td class='num'>7本 / 1,976</td><td class='barcell'><div class="bar"><span style="width:21.1%;background:var(--accent)"></span></div></td></tr>
+<h2 id="kata">根拠2：いま再生されている型、されていない型</h2>
+<p class="note">型は本文とハッシュタグの語による機械判定。<b>「直近60日」と「全期間」は別の表にしてある。</b>
+棒の長さは、それぞれの表の中の「再生中央値」の比較。2つの表の棒を見比べないこと。<br>
+本数が3本に満たない型は、中央値が当てにならないので出していない（本数と最大は出している）。</p>
+
+<h3>直近60日（19本）— いま出すならこちらで判断する</h3>
+<div class="tbl-scroll"><table>
+<tr><th>型</th><th class="num">本数</th><th class="num">再生中央値</th><th>中央値の比較</th><th class="num">最大</th></tr>
+<tr><td>症状の見分け・雑学</td><td class='num'>7</td><td class='num'>1,976</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td><td class='num'>10.2万</td></tr>
+<tr><td>その他</td><td class='num'>3</td><td class='num'>366</td><td class='barcell'><div class="bar"><span style="width:18.5%;background:var(--accent)"></span></div></td><td class='num'>886</td></tr>
+<tr><td>施術・術式の解説</td><td class='num'>4</td><td class='num'>37</td><td class='barcell'><div class="bar"><span style="width:1.9%;background:var(--accent)"></span></div></td><td class='num'>734</td></tr>
+<tr class='zero'><td>失敗・後悔・経過</td><td class='num'>2</td><td class='num'>—</td><td class='barcell'><span class='small'>本数が少ない</span></td><td class='num'>77</td></tr>
+<tr class='zero'><td>院内・スタッフ</td><td class='num'>2</td><td class='num'>—</td><td class='barcell'><span class='small'>本数が少ない</span></td><td class='num'>56</td></tr>
+<tr class='zero'><td>告知・キャンペーン</td><td class='num'>1</td><td class='num'>—</td><td class='barcell'><span class='small'>本数が少ない</span></td><td class='num'>39</td></tr>
 </table></div>
-<p class="note">型は本文とハッシュタグの語による機械判定。境界の回は下の一覧で目視できる。3本以上ある型のみ掲載。　「院内・スタッフ」2本は3本未満のため中央値を出していない。</p>
+
+<h3>全期間（146本）— 過去にどうだったか</h3>
+<div class="tbl-scroll"><table>
+<tr><th>型</th><th class="num">本数</th><th class="num">再生中央値</th><th>中央値の比較</th><th class="num">最大</th></tr>
+<tr><td>失敗・後悔・経過</td><td class='num'>57</td><td class='num'>9,355</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td><td class='num'>17.6万</td></tr>
+<tr><td>施術・術式の解説</td><td class='num'>32</td><td class='num'>9,013</td><td class='barcell'><div class="bar"><span style="width:96.3%;background:var(--accent)"></span></div></td><td class='num'>6.1万</td></tr>
+<tr><td>その他</td><td class='num'>39</td><td class='num'>8,081</td><td class='barcell'><div class="bar"><span style="width:86.4%;background:var(--accent)"></span></div></td><td class='num'>3.2万</td></tr>
+<tr><td>有名人・時事</td><td class='num'>4</td><td class='num'>7,295</td><td class='barcell'><div class="bar"><span style="width:78.0%;background:var(--accent)"></span></div></td><td class='num'>9,834</td></tr>
+<tr><td>告知・キャンペーン</td><td class='num'>5</td><td class='num'>6,534</td><td class='barcell'><div class="bar"><span style="width:69.8%;background:var(--accent)"></span></div></td><td class='num'>3.0万</td></tr>
+<tr><td>症状の見分け・雑学</td><td class='num'>7</td><td class='num'>1,976</td><td class='barcell'><div class="bar"><span style="width:21.1%;background:var(--accent)"></span></div></td><td class='num'>10.2万</td></tr>
+<tr class='zero'><td>院内・スタッフ</td><td class='num'>2</td><td class='num'>—</td><td class='barcell'><span class='small'>本数が少ない</span></td><td class='num'>56</td></tr>
+</table></div>
+
 <div class="card">
-<p style="margin-top:0"><b>この表は「型」と「時期」が混ざっているので、そのままでは読めない。</b></p>
-<p>「症状の見分け・雑学」は全期間の中央値1,976で6型中6位と低く出ているが、これは<b>7本すべてが直近60日に集中している</b>ためで、
-アカウント全体が落ちている時期の数字しか持っていないだけ。
-逆に全期間の首位「失敗・後悔・経過」の中央値9,355は、そのうち55本が2022〜2025年の回で稼いだもの。</p>
-<p style="margin-bottom:0"><b>同じ時期どうしで比べる（右端の列）と順位が逆転する。</b>
-直近60日で中央値が最も高いのは「症状の見分け・雑学」（7本・1,976再生）。2位の「その他」は3本・366再生。
-つまり<b>いま通るのは「症状の見分け・雑学」で、「失敗・後悔・経過」は"かつて通った型"</b>。
-「失敗・後悔・経過」を再開するなら、「症状の見分け・雑学」の入口とセットで出すのが安全。</p>
+<p style="margin-top:0"><b>2枚の表で1位が入れ替わっている。</b></p>
+<p>全期間で1位の「失敗・後悔・経過」は、57本のうち55本が2022〜2025年の回。
+アカウント全体がよく再生されていた頃の数字で1位になっている。</p>
+<p style="margin-bottom:0"><b>いま何を出すかは、直近60日の表で決める。</b>
+「失敗・後悔・経過」を再開するなら、「症状の見分け・雑学」の入り口とセットで出す。</p>
 </div>
 
-<h2>直近60日：主題別</h2>
-<div class="scroll"><table>
-<tr><th>主題</th><th class="num">本数</th><th class="num">中央値</th><th class="num">最大</th><th class="num">最小</th></tr>
+<h2 id="shudai">根拠3：何の話から入るかで差がついている（直近60日）</h2>
+<div class="tbl-scroll"><table>
+<tr><th>入り口の話題</th><th class="num">本数</th><th class="num">再生中央値</th><th class="num">最大</th><th class="num">最小</th></tr>
 <tr><td><span class="tag t-derm">症状名・一般皮膚</span></td><td class="num">9</td>
 <td class="num">1,519</td><td class="num">10.2万</td>
 <td class="num">39</td></tr>
@@ -138,11 +320,11 @@ TikTokはフォロワーよりおすすめ経由の比重が大きいので、<b
 <td class="num">4</td></tr>
 </table></div>
 
-<h2>ハッシュタグ</h2>
+<h2 id="tag">根拠4：ハッシュタグ</h2>
 <div class="two">
-<div><h3>伸びているタグ</h3>
-<div class="scroll"><table>
-<tr><th>タグ</th><th class="num">回数</th><th class="num">中央値</th><th></th></tr>
+<div><h3>再生数が多いタグ</h3>
+<div class="tbl-scroll"><table>
+<tr><th>タグ</th><th class="num">回数</th><th class="num">再生中央値</th><th>中央値の比較</th></tr>
 <tr><td class='title'>#クマ取り失敗?</td><td class='num'>3</td><td class='num'>2.8万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
 <tr><td class='title'>#美容外科</td><td class='num'>5</td><td class='num'>2.0万</td><td class='barcell'><div class="bar"><span style="width:71.8%;background:var(--accent)"></span></div></td></tr>
 <tr><td class='title'>#整形</td><td class='num'>3</td><td class='num'>1.7万</td><td class='barcell'><div class="bar"><span style="width:61.3%;background:var(--accent)"></span></div></td></tr>
@@ -158,9 +340,9 @@ TikTokはフォロワーよりおすすめ経由の比重が大きいので、<b
 <tr><td class='title'>#くま取り</td><td class='num'>5</td><td class='num'>1.1万</td><td class='barcell'><div class="bar"><span style="width:40.9%;background:var(--accent)"></span></div></td></tr>
 <tr><td class='title'>#クマ取り王</td><td class='num'>15</td><td class='num'>1.1万</td><td class='barcell'><div class="bar"><span style="width:40.9%;background:var(--accent)"></span></div></td></tr>
 </table></div></div>
-<div><h3>伸びていないタグ</h3>
-<div class="scroll"><table>
-<tr><th>タグ</th><th class="num">回数</th><th class="num">中央値</th><th></th></tr>
+<div><h3>再生数が少ないタグ</h3>
+<div class="tbl-scroll"><table>
+<tr><th>タグ</th><th class="num">回数</th><th class="num">再生中央値</th><th>中央値の比較</th></tr>
 <tr><td class='title'>#美容整形</td><td class='num'>12</td><td class='num'>6,158</td><td class='barcell'><div class="bar"><span style="width:22.0%;background:var(--bad)"></span></div></td></tr>
 <tr><td class='title'>#ミッドフェイスリフト</td><td class='num'>3</td><td class='num'>5,883</td><td class='barcell'><div class="bar"><span style="width:21.0%;background:var(--bad)"></span></div></td></tr>
 <tr><td class='title'>#美容</td><td class='num'>4</td><td class='num'>5,499</td><td class='barcell'><div class="bar"><span style="width:19.6%;background:var(--bad)"></span></div></td></tr>
@@ -169,116 +351,209 @@ TikTokはフォロワーよりおすすめ経由の比重が大きいので、<b
 <tr><td class='title'>#美容皮膚科</td><td class='num'>5</td><td class='num'>2,802</td><td class='barcell'><div class="bar"><span style="width:10.0%;background:var(--bad)"></span></div></td></tr>
 </table></div></div>
 </div>
-<p class="note">3回以上使ったタグのみ。タグが再生を生むのではなく、
-「そのタグを付ける主題が通っているか」を映している。</p>
+<p class="note">3回以上使ったタグのみ。棒の長さは「再生中央値」（2つの表で同じ基準）。
+タグが再生を生むのではなく、「そのタグを付ける話題がおすすめに載っているか」を映している。</p>
 
-<h2>尺</h2>
-<div class="scroll"><table>
-<tr><th>尺</th><th class="num">本数</th><th class="num">再生中央値</th><th></th></tr>
-<tr><td>20秒未満</td><td class='num'>19</td><td class='num'>6,337</td><td class='barcell'><div class="bar"><span style="width:59.2%;background:var(--accent)"></span></div></td></tr>
-<tr><td>20〜35秒</td><td class='num'>31</td><td class='num'>9,351</td><td class='barcell'><div class="bar"><span style="width:87.4%;background:var(--accent)"></span></div></td></tr>
-<tr><td>35〜50秒</td><td class='num'>19</td><td class='num'>8,081</td><td class='barcell'><div class="bar"><span style="width:75.5%;background:var(--accent)"></span></div></td></tr>
-<tr><td>50〜70秒</td><td class='num'>45</td><td class='num'>7,357</td><td class='barcell'><div class="bar"><span style="width:68.7%;background:var(--accent)"></span></div></td></tr>
-<tr><td>70秒以上</td><td class='num'>26</td><td class='num'>1.1万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
-</table></div>
-<p>直近60日の尺は中央値<b>60秒</b>、それ以前は<b>42秒</b>。尺と再生の相関はほぼ無い。
-尺そのものより主題の影響が大きいが、長い回ほど説明的になり宣伝色が出やすい。</p>
-
-<h2>出す曜日・時間帯</h2>
-<div class="two">
-<div><h3>曜日</h3><div class="scroll"><table>
-<tr><th>曜日</th><th class="num">本数</th><th class="num">中央値</th><th></th></tr>
-<tr><td>月</td><td class='num'>28</td><td class='num'>1.0万</td><td class='barcell'><div class="bar"><span style="width:94.5%;background:var(--accent)"></span></div></td></tr>
-<tr><td>火</td><td class='num'>24</td><td class='num'>8,585</td><td class='barcell'><div class="bar"><span style="width:80.4%;background:var(--accent)"></span></div></td></tr>
-<tr><td>水</td><td class='num'>16</td><td class='num'>9,015</td><td class='barcell'><div class="bar"><span style="width:84.4%;background:var(--accent)"></span></div></td></tr>
-<tr><td>木</td><td class='num'>13</td><td class='num'>1.1万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td>金</td><td class='num'>22</td><td class='num'>6,815</td><td class='barcell'><div class="bar"><span style="width:63.8%;background:var(--accent)"></span></div></td></tr>
-<tr><td>土</td><td class='num'>25</td><td class='num'>8,956</td><td class='barcell'><div class="bar"><span style="width:83.8%;background:var(--accent)"></span></div></td></tr>
-<tr><td>日</td><td class='num'>18</td><td class='num'>6,628</td><td class='barcell'><div class="bar"><span style="width:62.0%;background:var(--accent)"></span></div></td></tr>
-</table></div></div>
-<div><h3>時間帯</h3><div class="scroll"><table>
-<tr><th>時間</th><th class="num">本数</th><th class="num">中央値</th><th></th></tr>
-<tr><td>10〜13時</td><td class='num'>15</td><td class='num'>8,360</td><td class='barcell'><div class="bar"><span style="width:91.8%;background:var(--accent)"></span></div></td></tr>
-<tr><td>14〜17時</td><td class='num'>67</td><td class='num'>7,357</td><td class='barcell'><div class="bar"><span style="width:80.8%;background:var(--accent)"></span></div></td></tr>
-<tr><td>18〜20時</td><td class='num'>62</td><td class='num'>9,109</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--accent)"></span></div></td></tr>
-<tr><td>21〜23時</td><td class='num'>2</td><td class='num'>6,259</td><td class='barcell'><div class="bar"><span style="width:68.7%;background:var(--accent)"></span></div></td></tr>
-</table></div></div>
-</div>
-<p class="note">本数が偏っているので参考程度。主題の差のほうがはるかに大きい。</p>
-
-<h2>エンゲージメント</h2>
+<h2 id="eng">根拠5：反応（いいね・コメント・シェア）</h2>
 <div class="kpi">
-<div><b>0.39%</b><small>いいね率（中央値）</small></div>
-<div><b>0.02%</b><small>コメント率</small></div>
-<div><b>0.02%</b><small>シェア率</small></div>
+<div><b>0.39%</b><small>いいね数 ÷ 再生数（中央値）。1,000回再生で約3.9いいね</small></div>
+<div><b>0.02%</b><small>コメント数 ÷ 再生数。1,000回再生で約0.2件</small></div>
+<div><b>0.02%</b><small>シェア数 ÷ 再生数。1,000回再生で約0.2件</small></div>
 </div>
-<p>TikTokで拡散に効くのはシェア。<b>シェア率が高い回＝人に見せたくなった回</b>なので、企画の当たり判定に使える。</p>
-<div class="scroll"><table>
-<tr><th>投稿日</th><th class="num">再生</th><th class="num">シェア</th><th class="num">シェア率</th><th>本文</th></tr>
-<tr><td class='date'>2022-10-30</td><td class='num'>6,327</td><td class='num'>38</td><td class='num'>0.60%</td><td class='title'>何かお悩みがありましたらコメント欄に！毛利が全て答えます！#クマ治療 #クマ取り #目の下の</td></tr>
-<tr><td class='date'>2022-12-24</td><td class='num'>9,834</td><td class='num'>39</td><td class='num'>0.40%</td><td class='title'>橋本◯奈さんのクマ治療診断！！#クマ治療 #クマ治療診断 #切らないクマの治療 #クマ取り </td></tr>
-<tr><td class='date'>2023-01-27</td><td class='num'>1.1万</td><td class='num'>43</td><td class='num'>0.40%</td><td class='title'>クマ治療を検討してる方は必ず見てください！！ #クマ治療#クマ取り #クマ治したい人と繋がり</td></tr>
-<tr><td class='date'>2022-10-25</td><td class='num'>6,227</td><td class='num'>19</td><td class='num'>0.31%</td><td class='title'>【今すぐやめて】クマ治療にマッサージは有効かどうか！？徹底解説します！#クマ治療 #クマ取り</td></tr>
-<tr><td class='date'>2022-11-28</td><td class='num'>1.4万</td><td class='num'>36</td><td class='num'>0.26%</td><td class='title'>芸能人クマ診断🐻#クマ治療#クマ取り #クマ取り名人 #目の下のクマ #若返り #若返り美容</td></tr>
-<tr><td class='date'>2022-12-06</td><td class='num'>1.6万</td><td class='num'>39</td><td class='num'>0.24%</td><td class='title'>クマ治療は実際に痛いの？？#クマ取り #クマ治療 #クマ取り名人 #クマ取り痛み #目の下の</td></tr>
+<p>どれも分母は再生数（％が当てにならないので、再生300未満の回は除いている）。
+他院の数字はAPIで取れないため、よその平均とではなく<b>自分の過去と比べる</b>。</p>
+<p>TikTokで拡散に効くのはシェア。<b>シェア率が高い回＝人に見せたくなった回</b>なので、企画の良し悪しの判定に使える。</p>
+<div class="tbl-scroll"><table>
+<tr><th>投稿日</th><th class="num">再生</th><th class="num">シェア</th><th class="num">シェア率</th><th class="bodycol">本文</th></tr>
+<tr><td class='date'>2022-10-30</td><td class='num'>6,327</td><td class='num'>38</td><td class='num'>0.60%</td><td class='title bodycol'>何かお悩みがありましたらコメント欄に！毛利が全て答えます！#クマ治療 #クマ取り #目の下の…</td></tr>
+<tr><td class='date'>2022-12-24</td><td class='num'>9,834</td><td class='num'>39</td><td class='num'>0.40%</td><td class='title bodycol'>橋本◯奈さんのクマ治療診断！！#クマ治療 #クマ治療診断 #切らないクマの治療 #クマ取り…</td></tr>
+<tr><td class='date'>2023-01-27</td><td class='num'>1.1万</td><td class='num'>43</td><td class='num'>0.40%</td><td class='title bodycol'>クマ治療を検討してる方は必ず見てください！！ #クマ治療#クマ取り #クマ治したい人と繋がり…</td></tr>
+<tr><td class='date'>2022-10-25</td><td class='num'>6,227</td><td class='num'>19</td><td class='num'>0.31%</td><td class='title bodycol'>【今すぐやめて】クマ治療にマッサージは有効かどうか！？徹底解説します！#クマ治療 #クマ取り…</td></tr>
+<tr><td class='date'>2022-11-28</td><td class='num'>1.4万</td><td class='num'>36</td><td class='num'>0.26%</td><td class='title bodycol'>芸能人クマ診断🐻#クマ治療#クマ取り #クマ取り名人 #目の下のクマ #若返り #若返り美容</td></tr>
+<tr><td class='date'>2022-12-06</td><td class='num'>1.6万</td><td class='num'>39</td><td class='num'>0.24%</td><td class='title bodycol'>クマ治療は実際に痛いの？？#クマ取り #クマ治療 #クマ取り名人 #クマ取り痛み #目の下の…</td></tr>
 </table></div>
-<p class="note">再生300未満の回は率が暴れるため除外している。</p>
+<p class="note mobile-only">狭い画面では本文の列を省いています。パソコンで見ると本文も出ます。</p>
 
-<h2>直近で伸びなかった回</h2>
-<div class="scroll"><table>
-<tr><th>投稿日</th><th class="num">再生</th><th></th><th>尺</th><th>型</th><th>主題</th><th>本文</th></tr>
-<tr><td class='date'>2026-09-07</td><td class='num'>4</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>80秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>表ハムラ法で外反になりやすい人の共通点 リスクを知らずに受ける前に、必ずチェックしてほしい5つの特徴をま</td></tr>
-<tr><td class='date'>2026-08-30</td><td class='num'>14</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>67秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>クマ取りのカウンセリングで「絶対に聞いたほうがいいこと」3選⚠️#クマ治療 #クマ取り </td></tr>
-<tr><td class='date'>2026-09-01</td><td class='num'>20</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>60秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>塗るだけで涙袋爆誕？医師が真相を暴きます⚠️ #涙袋 #涙袋形成 #クマ治療 #クマ取り </td></tr>
-<tr><td class='date'>2026-08-24</td><td class='num'>39</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>36秒</td><td>告知・キャンペーン</td><td><span class='tag t-derm'>症状名</span></td><td class='title'>気になってたアレ、&quot;全部&quot;やるなら３周年キャンペーンで！ #クマ治療 #クマ取り #キャンペーン #美容</td></tr>
-<tr><td class='date'>2026-08-06</td><td class='num'>52</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>28秒</td><td>院内・スタッフ</td><td><span class='tag t-derm'>症状名</span></td><td class='title'>クリニック選びで決め手になったこと #クマ取り #インタビュー #美容 </td></tr>
-<tr><td class='date'>2026-08-10</td><td class='num'>54</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>68秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>それ、本当に必要ですか？涙袋形成の罠⚠️#クマ治療　　#クマ取り </td></tr>
-<tr><td class='date'>2026-08-15</td><td class='num'>56</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>66秒</td><td>院内・スタッフ</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>「先生、まだまだですねww」スタッフからの抜き打ちテスト📝#クマ治療 #クマ取り </td></tr>
-<tr><td class='date'>2026-08-09</td><td class='num'>59</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>55秒</td><td>その他</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>共有相手（種類ごとに分けるか／全員か） 共有したい種類（まず広報だけ、など一部からでもOK）#クマ取り </td></tr>
-<tr><td class='date'>2026-08-16</td><td class='num'>77</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>60秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>クマ取りが「再発する人」と「しない人」、分かれ目はここです。#クマ治療 #クマ取り #整形失敗 </td></tr>
-<tr><td class='date'>2026-08-27</td><td class='num'>366</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>65秒</td><td>その他</td><td><span class='tag t-other'>その他</span></td><td class='title'>脂肪は「財産」か？「負債」か？💡</td></tr>
-</table></div>
-
-<h2>全期間の上位12本</h2>
-<div class="scroll"><table>
-<tr><th>投稿日</th><th class="num">再生</th><th></th><th>尺</th><th>型</th><th>主題</th><th>本文</th></tr>
-<tr><td class='date'>2025-01-17</td><td class='num'>17.6万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--good)"></span></div></td><td class='dur'>32秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>【クマ治療】クマ取り失敗？！ 地獄の日々... #クマ取り#クマ治療#クマ取り#整形#整形失敗#ダウンタ</td></tr>
-<tr><td class='date'>2026-08-25</td><td class='num'>10.2万</td><td class='barcell'><div class="bar"><span style="width:57.8%;background:var(--good)"></span></div></td><td class='dur'>51秒</td><td>症状の見分け・雑学</td><td><span class='tag t-derm'>症状名</span></td><td class='title'>指の横にできる「猛烈に痒いブツブツ」の正体⚡️ #汗疱 #クマ治療 #クマ取り  #美容皮膚科 #美容外</td></tr>
-<tr><td class='date'>2025-01-20</td><td class='num'>6.7万</td><td class='barcell'><div class="bar"><span style="width:38.0%;background:var(--good)"></span></div></td><td class='dur'>28秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>【クマ治療】クマ取り失敗！？地獄の日々#クマ取り #クマ治療 #クマ取りダウンタイム </td></tr>
-<tr><td class='date'>2025-01-13</td><td class='num'>6.1万</td><td class='barcell'><div class="bar"><span style="width:34.7%;background:var(--good)"></span></div></td><td class='dur'>26秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>【クマ治療】クマ取り失敗！？地獄の日々#クマ取り #クマ治療 #クマ治療経過 #クマ取りダウンタイム #</td></tr>
-<tr><td class='date'>2023-09-02</td><td class='num'>6.1万</td><td class='barcell'><div class="bar"><span style="width:34.4%;background:var(--good)"></span></div></td><td class='dur'>51秒</td><td>施術・術式の解説</td><td><span class='tag t-derm'>症状名</span></td><td class='title'>あまり知られていないゴルゴ線の治療方法！？#ゴルゴ線 #ゴルゴ線改善 #ゴルゴ線ヒアルロン酸 #ゴルゴ線</td></tr>
-<tr><td class='date'>2023-06-24</td><td class='num'>5.4万</td><td class='barcell'><div class="bar"><span style="width:30.9%;background:var(--good)"></span></div></td><td class='dur'>81秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>クマ取り失敗😔 #クマ取り #クマ取り整形 #クマ取り失敗 #クマ取り失敗? #クマ取り王 #クマ取り名</td></tr>
-<tr><td class='date'>2025-03-07</td><td class='num'>5.0万</td><td class='barcell'><div class="bar"><span style="width:28.5%;background:var(--good)"></span></div></td><td class='dur'>30秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>クマ取り失敗。地獄の日々...あれから3ヶ月経ちました。 #クマ取り #若返り #若返り治療 #整形失敗</td></tr>
-<tr><td class='date'>2022-12-23</td><td class='num'>3.9万</td><td class='barcell'><div class="bar"><span style="width:21.9%;background:var(--good)"></span></div></td><td class='dur'>17秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>クマ治療症例数全国1位 毛利理人医師※SBC内2022年上半期#クマ治療 #裏ハムラ #クマ取り名人 #</td></tr>
-<tr><td class='date'>2022-12-17</td><td class='num'>3.2万</td><td class='barcell'><div class="bar"><span style="width:18.3%;background:var(--good)"></span></div></td><td class='dur'>59秒</td><td>その他</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>【驚愕】クマ治療のデメリットについてご紹介！#クマ治療 #クマ治療のデメリット #クマ取り #クマ取り整</td></tr>
-<tr><td class='date'>2023-04-29</td><td class='num'>3.2万</td><td class='barcell'><div class="bar"><span style="width:18.0%;background:var(--good)"></span></div></td><td class='dur'>78秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>クマ治療するなら脱脂とハムラ法どちらを選ぶべきか！#クマ取り #裏ハムラ #クマ取り名人 #クマ解説 #</td></tr>
-<tr><td class='date'>2023-06-03</td><td class='num'>3.1万</td><td class='barcell'><div class="bar"><span style="width:17.6%;background:var(--good)"></span></div></td><td class='dur'>76秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>みなさん知ってますか？クマの種類！#クマ取り #クマ取り名人 #クマ取りダウンタイム #クマ取り王 #美</td></tr>
-<tr><td class='date'>2023-08-23</td><td class='num'>3.0万</td><td class='barcell'><div class="bar"><span style="width:16.9%;background:var(--good)"></span></div></td><td class='dur'>0秒</td><td>告知・キャンペーン</td><td><span class='tag t-promo'>宣伝</span></td><td class='title'>※今後の予約については↓↓までスクロールを この度、毛利理人は10月末日でSBCグループを退職することと</td></tr>
+<h2 id="ichiran">根拠6：1本ずつの一覧</h2>
+<h3>直近で伸びなかった回</h3>
+<div class="tbl-scroll"><table>
+<tr><th>投稿日</th><th class="num">再生</th><th>棒＝直近の最高（10.2万再生）との比</th><th>長さ</th><th>型</th><th>入り口</th><th class="bodycol">本文</th></tr>
+<tr><td class='date'>2026-09-07</td><td class='num'>4</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>80秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>表ハムラ法で外反になりやすい人の共通点 リスクを知らずに受ける前に、必ずチェックしてほしい5つの特徴をま…</td></tr>
+<tr><td class='date'>2026-08-30</td><td class='num'>14</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>67秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>クマ取りのカウンセリングで「絶対に聞いたほうがいいこと」3選⚠️#クマ治療 #クマ取り</td></tr>
+<tr><td class='date'>2026-09-01</td><td class='num'>20</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>60秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>塗るだけで涙袋爆誕？医師が真相を暴きます⚠️ #涙袋 #涙袋形成 #クマ治療 #クマ取り</td></tr>
+<tr><td class='date'>2026-08-24</td><td class='num'>39</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>36秒</td><td>告知・キャンペーン</td><td><span class='tag t-derm'>症状名</span></td><td class='title bodycol'>気になってたアレ、&quot;全部&quot;やるなら３周年キャンペーンで！ #クマ治療 #クマ取り #キャンペーン #美容…</td></tr>
+<tr><td class='date'>2026-08-06</td><td class='num'>52</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>28秒</td><td>院内・スタッフ</td><td><span class='tag t-derm'>症状名</span></td><td class='title bodycol'>クリニック選びで決め手になったこと #クマ取り #インタビュー #美容</td></tr>
+<tr><td class='date'>2026-08-10</td><td class='num'>54</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>68秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>それ、本当に必要ですか？涙袋形成の罠⚠️#クマ治療　　#クマ取り</td></tr>
+<tr><td class='date'>2026-08-15</td><td class='num'>56</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>66秒</td><td>院内・スタッフ</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>「先生、まだまだですねww」スタッフからの抜き打ちテスト📝#クマ治療 #クマ取り</td></tr>
+<tr><td class='date'>2026-08-09</td><td class='num'>59</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>55秒</td><td>その他</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'><span class='warn'>投稿文に社内メモが混ざったまま公開された回</span> #クマ取り #クマ治療 #フロスト縫合 #eyebags</td></tr>
+<tr><td class='date'>2026-08-16</td><td class='num'>77</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>60秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>クマ取りが「再発する人」と「しない人」、分かれ目はここです。#クマ治療 #クマ取り #整形失敗</td></tr>
+<tr><td class='date'>2026-08-27</td><td class='num'>366</td><td class='barcell'><div class="bar"><span style="width:1.5%;background:var(--bad)"></span></div></td><td class='dur'>65秒</td><td>その他</td><td><span class='tag t-other'>その他</span></td><td class='title bodycol'>脂肪は「財産」か？「負債」か？💡</td></tr>
 </table></div>
 
-<h2>良い点</h2>
-<ul>
-<li><b>当たりの型は自前で持っている。</b>「失敗・後悔・経過」・「症状の見分け・雑学」は、他所から借りずに撮れる。</li>
-<li><b>直近の最高10.2万再生は偶然ではない。</b>同じ「症状の見分け・雑学」の型が直近60日に7本あり、中央値も1,976再生。再現性がある。</li>
-<li><b>投稿が止まっていない。</b>2026-07-31以降の43日間で19本、週3.1本ペース。主題を替えるだけで効き始める土台はある。</li>
-</ul>
+<h3>全期間の上位12本</h3>
+<div class="tbl-scroll"><table>
+<tr><th>投稿日</th><th class="num">再生</th><th>棒＝1位（17.6万再生）との比</th><th>長さ</th><th>型</th><th>入り口</th><th class="bodycol">本文</th></tr>
+<tr><td class='date'>2025-01-17</td><td class='num'>17.6万</td><td class='barcell'><div class="bar"><span style="width:100.0%;background:var(--good)"></span></div></td><td class='dur'>32秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>【クマ治療】クマ取り失敗？！ 地獄の日々... #クマ取り#クマ治療#クマ取り#整形#整形失敗#ダウンタ…</td></tr>
+<tr><td class='date'>2026-08-25</td><td class='num'>10.2万</td><td class='barcell'><div class="bar"><span style="width:57.8%;background:var(--good)"></span></div></td><td class='dur'>51秒</td><td>症状の見分け・雑学</td><td><span class='tag t-derm'>症状名</span></td><td class='title bodycol'>指の横にできる「猛烈に痒いブツブツ」の正体⚡️ #汗疱 #クマ治療 #クマ取り  #美容皮膚科 #美容外…</td></tr>
+<tr><td class='date'>2025-01-20</td><td class='num'>6.7万</td><td class='barcell'><div class="bar"><span style="width:38.0%;background:var(--good)"></span></div></td><td class='dur'>28秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>【クマ治療】クマ取り失敗！？地獄の日々#クマ取り #クマ治療 #クマ取りダウンタイム</td></tr>
+<tr><td class='date'>2025-01-13</td><td class='num'>6.1万</td><td class='barcell'><div class="bar"><span style="width:34.7%;background:var(--good)"></span></div></td><td class='dur'>26秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>【クマ治療】クマ取り失敗！？地獄の日々#クマ取り #クマ治療 #クマ治療経過 #クマ取りダウンタイム #</td></tr>
+<tr><td class='date'>2023-09-02</td><td class='num'>6.1万</td><td class='barcell'><div class="bar"><span style="width:34.4%;background:var(--good)"></span></div></td><td class='dur'>51秒</td><td>施術・術式の解説</td><td><span class='tag t-derm'>症状名</span></td><td class='title bodycol'>あまり知られていないゴルゴ線の治療方法！？#ゴルゴ線 #ゴルゴ線改善 #ゴルゴ線ヒアルロン酸 #ゴルゴ線…</td></tr>
+<tr><td class='date'>2023-06-24</td><td class='num'>5.4万</td><td class='barcell'><div class="bar"><span style="width:30.9%;background:var(--good)"></span></div></td><td class='dur'>81秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>クマ取り失敗😔 #クマ取り #クマ取り整形 #クマ取り失敗 #クマ取り失敗? #クマ取り王 #クマ取り名…</td></tr>
+<tr><td class='date'>2025-03-07</td><td class='num'>5.0万</td><td class='barcell'><div class="bar"><span style="width:28.5%;background:var(--good)"></span></div></td><td class='dur'>30秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>クマ取り失敗。地獄の日々...あれから3ヶ月経ちました。 #クマ取り #若返り #若返り治療 #整形失敗</td></tr>
+<tr><td class='date'>2022-12-23</td><td class='num'>3.9万</td><td class='barcell'><div class="bar"><span style="width:21.9%;background:var(--good)"></span></div></td><td class='dur'>17秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>クマ治療症例数全国1位 毛利理人医師※SBC内2022年上半期#クマ治療 #裏ハムラ #クマ取り名人 #…</td></tr>
+<tr><td class='date'>2022-12-17</td><td class='num'>3.2万</td><td class='barcell'><div class="bar"><span style="width:18.3%;background:var(--good)"></span></div></td><td class='dur'>59秒</td><td>その他</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>【驚愕】クマ治療のデメリットについてご紹介！#クマ治療 #クマ治療のデメリット #クマ取り #クマ取り整…</td></tr>
+<tr><td class='date'>2023-04-29</td><td class='num'>3.2万</td><td class='barcell'><div class="bar"><span style="width:18.0%;background:var(--good)"></span></div></td><td class='dur'>78秒</td><td>施術・術式の解説</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>クマ治療するなら脱脂とハムラ法どちらを選ぶべきか！#クマ取り #裏ハムラ #クマ取り名人 #クマ解説 #…</td></tr>
+<tr><td class='date'>2023-06-03</td><td class='num'>3.1万</td><td class='barcell'><div class="bar"><span style="width:17.6%;background:var(--good)"></span></div></td><td class='dur'>76秒</td><td>失敗・後悔・経過</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>みなさん知ってますか？クマの種類！#クマ取り #クマ取り名人 #クマ取りダウンタイム #クマ取り王 #美…</td></tr>
+<tr><td class='date'>2023-08-23</td><td class='num'>3.0万</td><td class='barcell'><div class="bar"><span style="width:16.9%;background:var(--good)"></span></div></td><td class='dur'>0秒</td><td>告知・キャンペーン</td><td><span class='tag t-promo'>宣伝</span></td><td class='title bodycol'>※今後の予約については↓↓までスクロールを この度、毛利理人は10月末日でSBCグループを退職することと…</td></tr>
+</table></div>
+<p class="note mobile-only">狭い画面では本文の列を省いています。パソコンで見ると本文も出ます。</p>
+<p class="note">本文が長い回は途中で切って「…」を付けている。</p>
 
-<h2>やるべきこと</h2>
-<ul>
-<li><b>1. 入口を症状名にする。</b>「クマ取り」ではなく、視聴者が自分の症状として検索する言葉から入る。
-見終わる頃に目元へ接続する構造にする。</li>
-<li><b>2. ハッシュタグの先頭を症状名にする。</b>#クマ取り は付けても最後に1つで足りる。</li>
-<li><b>3. 尺は伸びの決め手になっていない。</b>尺と再生の相関はほぼ無い。実測で中央値が最も高いのは70秒以上、上位12本の尺は中央値51秒、直近は60秒。尺を目標にせず主題を優先する。</li>
-<li><b>4. キャンペーン・料金・カウンセリング訴求の単独投稿をやめる。</b>直近60日の宣伝主題は9本・中央値56再生。
-告知は届いた回の中で一言触れる形にする。</li>
-<li><b>5. シェア率で企画を判定する。</b>再生は主題に引きずられるが、シェア率は中身の力を映す。</li>
-<li><b>6. フォロワー数を目標にしない。</b>到達率10%が示すとおり、フォロワーは届き方をほぼ決めていない。</li>
-<li><b>7. 週3.1本のうち1本を「症状の見分け・雑学」に固定する。</b>当たりを狙うのではなく、通る枠を確保する。</li>
-</ul>
+<h2 id="sanko">参考：効きが小さいと分かっているもの</h2>
+
+<details>
+<summary>動画の長さ（尺）— 動画の長さと再生数は、ほとんど連動していない</summary>
+<p>直近60日の長さは中央値<b>60秒</b>、それ以前は<b>42秒</b>。
+長さそのものより、何の話から入るかの影響が大きい。ただし長い回ほど説明的になり、宣伝色が出やすい。</p>
+<div class="tbl-scroll"><table>
+<tr><th>長さ</th><th class="num">本数</th><th class="num">再生中央値</th></tr>
+<tr><td>20秒未満</td><td class='num'>19</td><td class='num'>6,337</td></tr>
+<tr><td>20〜35秒</td><td class='num'>31</td><td class='num'>9,351</td></tr>
+<tr><td>35〜50秒</td><td class='num'>19</td><td class='num'>8,081</td></tr>
+<tr><td>50〜70秒</td><td class='num'>45</td><td class='num'>7,357</td></tr>
+<tr><td>70秒以上</td><td class='num'>26</td><td class='num'>1.1万</td></tr>
+</table></div>
+<p class="note">本数が帯ごとに偏っているため、棒グラフは出していない（「長いほうが良い」と読めてしまうため）。</p>
+</details>
+
+<details>
+<summary>出す曜日・時間帯 — 本数が偏っており、参考程度</summary>
+<div class="two">
+<div><h3>曜日</h3><div class="tbl-scroll"><table>
+<tr><th>曜日</th><th class="num">本数</th><th class="num">再生中央値</th></tr>
+<tr><td>月</td><td class='num'>28</td><td class='num'>1.0万</td></tr>
+<tr><td>火</td><td class='num'>24</td><td class='num'>8,585</td></tr>
+<tr><td>水</td><td class='num'>16</td><td class='num'>9,015</td></tr>
+<tr><td>木</td><td class='num'>13</td><td class='num'>1.1万</td></tr>
+<tr><td>金</td><td class='num'>22</td><td class='num'>6,815</td></tr>
+<tr><td>土</td><td class='num'>25</td><td class='num'>8,956</td></tr>
+<tr><td>日</td><td class='num'>18</td><td class='num'>6,628</td></tr>
+</table></div></div>
+<div><h3>時間帯</h3><div class="tbl-scroll"><table>
+<tr><th>時間</th><th class="num">本数</th><th class="num">再生中央値</th></tr>
+<tr><td>10〜13時</td><td class='num'>15</td><td class='num'>8,360</td></tr>
+<tr><td>14〜17時</td><td class='num'>67</td><td class='num'>7,357</td></tr>
+<tr><td>18〜20時</td><td class='num'>62</td><td class='num'>9,109</td></tr>
+<tr><td>21〜23時</td><td class='num'>2</td><td class='num'>6,259</td></tr>
+</table></div></div>
+</div>
+<p class="note">どの曜日・時間に出すかより、何の話から入るかの差のほうがはるかに大きい。</p>
+</details>
 
 <footer>
-数字はすべて TikTok Display API の実データ（2026-09-11 09:54 時点、146本／当日投稿0本は集計から除外）。
+数字はすべて TikTok Display API の実データ（2026-09-11 15:07 時点、146本／当日投稿0本は集計から除外）。
 保存数・視聴維持率・平均視聴時間・フォロワー属性は API で公開されておらず、TikTokアプリの分析画面でしか見られない。<br>
-再生数は累積のため古い投稿ほど有利。型・主題の振り分けは本文とハッシュタグの語による機械判定で、完全ではない。
+再生数は累計のため古い投稿ほど有利。型・入り口の振り分けは本文とハッシュタグの語による機械判定で、完全ではない。<br>
+投稿文に社内メモが混ざったまま公開された回は、一覧でその旨を出し、メモ本文は表示していない（再生数は実データのまま）。
 </footer>
-</div></body></html>
+</div>
+<script>
+/* 表と横長グラフを、描画後に「スクロールできると分かる」形へ包み直す。
+   report_mobile.css と対で使う。各媒体の gen_report.py がインライン展開する。
+
+   各ページの表を生成しているコードは5媒体でバラバラなので、
+   生成側を触らずに済むよう、出来上がった DOM に対して後から適用する。 */
+(function () {
+  "use strict";
+
+  function wrap(el, cls) {
+    var p = el.parentNode;
+    if (p && p.classList && p.classList.contains(cls)) return p;  // 二重に包まない
+    var box = document.createElement("div");
+    box.className = cls;
+    p.insertBefore(box, el);
+    box.appendChild(el);
+    return box;
+  }
+
+  function hintFor(box) {
+    var h = box.nextElementSibling;
+    if (h && h.classList && h.classList.contains("tbl-hint")) return h;
+    h = document.createElement("p");
+    h.className = "tbl-hint";
+    h.textContent = "横にスクロールすると続きが見られます";
+    box.parentNode.insertBefore(h, box.nextSibling);
+    return h;
+  }
+
+  function sync(box, hint) {
+    // はみ出しているか。端数の丸めで1〜2pxずれることがあるので少し余裕を見る
+    // （余裕が無いと、実際には収まっている表にも案内が出てしまう）
+    var over = box.scrollWidth - box.clientWidth > 4;
+    box.classList.toggle("is-scrollable", over);
+    if (hint) hint.classList.toggle("is-on", over);
+    // 右端まで送ったらフェードを消す
+    var end = box.scrollLeft + box.clientWidth >= box.scrollWidth - 1;
+    box.classList.toggle("is-end", end);
+  }
+
+  function setup() {
+    var targets = [];
+
+    Array.prototype.forEach.call(document.querySelectorAll("table"), function (t) {
+      // すでに独自のスクロール枠を持っているものはクラスだけ足す（tiktok の .scroll）
+      var box = wrap(t, "tbl-scroll");
+      targets.push([box, hintFor(box)]);
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll("svg"), function (s) {
+      var w = parseFloat(s.getAttribute("width") || "0");
+      var vb = (s.getAttribute("viewBox") || "").split(/[\s,]+/);
+      var vw = vb.length === 4 ? parseFloat(vb[2]) : 0;
+      // 横長で、縮めると軸ラベルが潰れるものだけ対象にする
+      if (Math.max(w, vw) < 480) return;
+      var box = wrap(s, "svg-scroll");
+      targets.push([box, hintFor(box)]);
+    });
+
+    targets.forEach(function (pair) {
+      var box = pair[0], hint = pair[1];
+      sync(box, hint);
+      box.addEventListener("scroll", function () { sync(box, hint); }, { passive: true });
+    });
+
+    function resyncAll() {
+      targets.forEach(function (p) { sync(p[0], p[1]); });
+    }
+
+    var t = null;
+    window.addEventListener("resize", function () {
+      clearTimeout(t);
+      t = setTimeout(resyncAll, 120);
+    });
+
+    // DOMContentLoaded の時点ではWebフォントがまだ届いておらず、
+    // あとからフォントが差し替わると表の幅が変わる。測り直さないと
+    // 「はみ出しているのに案内が出ない」状態のままになる。
+    window.addEventListener("load", resyncAll);
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(resyncAll).catch(function () {});
+    }
+    setTimeout(resyncAll, 800);   // 上記が発火しない環境への保険
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", setup);
+  } else {
+    setup();
+  }
+})();
+
+</script>
+<script>
+/* 畳んである節を開いたとき、表の「横スクロールできます」を出し直す */
+document.querySelectorAll("details").forEach(function (d) {
+  d.addEventListener("toggle", function () { window.dispatchEvent(new Event("resize")); });
+});
+</script>
+</body></html>
